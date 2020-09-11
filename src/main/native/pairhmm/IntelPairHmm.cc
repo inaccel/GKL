@@ -14,6 +14,7 @@
 #endif
 #include "Context.h"
 #include "JavaData.h"
+#include "shacc_pairhmm.h"
 
 bool g_use_double;
 int g_max_threads;
@@ -104,7 +105,8 @@ JNIEXPORT void JNICALL Java_com_intel_gkl_pairhmm_IntelPairHmm_computeLikelihood
   JavaData javaData;
   std::vector<testcase> testcases = javaData.getData(env, readDataArray, haplotypeDataArray);
   double* javaResults = javaData.getOutputArray(env, likelihoodArray);
-  
+  bool use_fpga = true;
+
   //==================================================================
   // calcutate pairHMM
 
@@ -114,7 +116,17 @@ JNIEXPORT void JNICALL Java_com_intel_gkl_pairhmm_IntelPairHmm_computeLikelihood
   for (int i = 0; i < testcases.size(); i++) {
     double result_final = 0;
 
-    float result_float = g_use_double ? 0.0f : g_compute_full_prob_float(&testcases[i]);
+	float result_float;
+	if(use_fpga){
+		try {
+			result_float = g_use_double ? 0.0f :fpga_pairhmm(testcases[i]);
+		} catch (...) {
+			use_fpga = false;
+		}
+	}
+	if(!use_fpga){
+		result_float = g_use_double ? 0.0f :g_compute_full_prob_float(&testcases[i]);
+	}
 
     if (result_float < MIN_ACCEPTED) {
       double result_double = g_compute_full_prob_double(&testcases[i]);
